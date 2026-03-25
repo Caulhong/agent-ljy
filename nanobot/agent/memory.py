@@ -42,11 +42,48 @@ _SAVE_MEMORY_TOOL = [
 ]
 
 
+def init_user_workspace(workspace: Path, user_id: str) -> Path:
+    """Create workspace/users/{user_id}/ with MEMORY.md, HISTORY.md, USER.md and sessions/ subdir.
+
+    Safe to call multiple times — only creates missing files/dirs.
+    Returns the user directory path.
+    """
+    user_dir = ensure_dir(workspace / "users" / user_id)
+
+    try:
+        from importlib.resources import files as pkg_files
+        tpl_root = pkg_files("nanobot") / "templates"
+        tpl_memory = tpl_root / "memory" / "MEMORY.md"
+        tpl_user = tpl_root / "USER.md"
+    except Exception:
+        tpl_root = tpl_memory = tpl_user = None
+
+    def _copy_template(tpl, dest: Path, fallback: str) -> None:
+        if dest.exists():
+            return
+        try:
+            dest.write_text(tpl.read_text(encoding="utf-8"), encoding="utf-8")
+        except Exception:
+            dest.write_text(fallback, encoding="utf-8")
+
+    _copy_template(tpl_memory, user_dir / "MEMORY.md", "# Long-term Memory\n\n")
+    _copy_template(tpl_user,   user_dir / "USER.md",   "# User Profile\n\n")
+
+    if not (user_dir / "HISTORY.md").exists():
+        (user_dir / "HISTORY.md").write_text("", encoding="utf-8")
+
+    return user_dir
+
+
 class MemoryStore:
     """Two-layer memory: MEMORY.md (long-term facts) + HISTORY.md (grep-searchable log)."""
 
-    def __init__(self, workspace: Path):
-        self.memory_dir = ensure_dir(workspace / "memory")
+    def __init__(self, workspace: Path, user_id: str | None = None):
+        if user_id:
+            base = init_user_workspace(workspace, user_id)
+        else:
+            base = workspace / "memory"
+        self.memory_dir = ensure_dir(base)
         self.memory_file = self.memory_dir / "MEMORY.md"
         self.history_file = self.memory_dir / "HISTORY.md"
 

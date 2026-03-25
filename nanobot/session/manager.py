@@ -1,7 +1,7 @@
-"""Session management for conversation history."""
+"""Session management for conversation history — SQLite backend."""
 
 import json
-import shutil
+import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -9,36 +9,68 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.config.paths import get_legacy_sessions_dir
-from nanobot.utils.helpers import ensure_dir, safe_filename
+from nanobot.agent.memory import init_user_workspace
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    user_id    TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    key              TEXT PRIMARY KEY,
+    user_id          TEXT REFERENCES users(user_id),
+    title            TEXT,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL,
+    last_consolidated INTEGER NOT NULL DEFAULT 0,
+    metadata         TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_key  TEXT NOT NULL REFERENCES sessions(key),
+    role         TEXT NOT NULL,
+    content      TEXT,
+    timestamp    TEXT NOT NULL,
+    extra        TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_key, id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC);
+"""
+
+# Message fields that go into the `extra` JSON column
+_EXTRA_KEYS = ("tool_calls", "tool_call_id", "name", "tools_used",
+               "reasoning_content", "thinking_blocks")
 
 
 @dataclass
 class Session:
     """
-    A conversation session.
+    An in-memory conversation session.
 
-    Stores messages in JSONL format for easy reading and persistence.
-
-    Important: Messages are append-only for LLM cache efficiency.
-    The consolidation process writes summaries to MEMORY.md/HISTORY.md
-    but does NOT modify the messages list or get_history() output.
+    Messages are append-only for LLM cache efficiency.
+    Consolidation writes summaries to MEMORY.md/HISTORY.md but does NOT
+    modify the messages list or get_history() output.
     """
 
-    key: str  # channel:chat_id
+    key: str
     messages: list[dict[str, Any]] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     metadata: dict[str, Any] = field(default_factory=dict)
-    last_consolidated: int = 0  # Number of messages already consolidated to files
+    last_consolidated: int = 0
+    # Tracks how many messages are already persisted in DB (private, not compared/repr'd)
+    _db_message_count: int = field(default=0, repr=False, compare=False)
 
     def add_message(self, role: str, content: str, **kwargs: Any) -> None:
-        """Add a message to the session."""
         msg = {
             "role": role,
             "content": content,
             "timestamp": datetime.now().isoformat(),
-            **kwargs
+            **kwargs,
         }
         self.messages.append(msg)
         self.updated_at = datetime.now()
@@ -67,147 +99,221 @@ class Session:
         """Clear all messages and reset session to initial state."""
         self.messages = []
         self.last_consolidated = 0
+        # Keep _db_message_count unchanged so save() can detect the clear and DELETE from DB
         self.updated_at = datetime.now()
 
 
 class SessionManager:
-    """
-    Manages conversation sessions.
-
-    Sessions are stored as JSONL files in the sessions directory.
-    """
+    """Manages conversation sessions backed by SQLite."""
 
     def __init__(self, workspace: Path):
         self.workspace = workspace
-        self.sessions_dir = ensure_dir(self.workspace / "sessions")
-        self.legacy_sessions_dir = get_legacy_sessions_dir()
+        self._db_path = workspace / "sessions.db"
+        self._conn: sqlite3.Connection | None = None
         self._cache: dict[str, Session] = {}
+        self._init_db()
 
-    def _get_session_path(self, key: str) -> Path:
-        """Get the file path for a session."""
-        safe_key = safe_filename(key.replace(":", "_"))
-        return self.sessions_dir / f"{safe_key}.jsonl"
+    # ── DB connection ─────────────────────────────────────────────────────────
 
-    def _get_legacy_session_path(self, key: str) -> Path:
-        """Legacy global session path (~/.nanobot/sessions/)."""
-        safe_key = safe_filename(key.replace(":", "_"))
-        return self.legacy_sessions_dir / f"{safe_key}.jsonl"
+    def _get_conn(self) -> sqlite3.Connection:
+        if self._conn is None:
+            self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+            self._conn.row_factory = sqlite3.Row
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA foreign_keys=ON")
+        return self._conn
+
+    def _init_db(self) -> None:
+        conn = self._get_conn()
+        conn.executescript(_SCHEMA)
+        conn.commit()
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _extract_user_id(key: str) -> str | None:
+        parts = key.split(":", 2)
+        if len(parts) >= 2 and parts[0] in ("http", "cli") and parts[1]:
+            return parts[1]
+        return None
+
+    # ── Public API ────────────────────────────────────────────────────────────
 
     def get_or_create(self, key: str) -> Session:
-        """
-        Get an existing session or create a new one.
-
-        Args:
-            key: Session key (usually channel:chat_id).
-
-        Returns:
-            The session.
-        """
         if key in self._cache:
             return self._cache[key]
 
         session = self._load(key)
         if session is None:
             session = Session(key=key)
+            user_id = self._extract_user_id(key)
+            if user_id:
+                init_user_workspace(self.workspace, user_id)
+                self.create_user(user_id)  # ensure user record exists
+            conn = self._get_conn()
+            conn.execute(
+                "INSERT INTO sessions (key, user_id, created_at, updated_at, last_consolidated, metadata)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (key, user_id,
+                 session.created_at.isoformat(), session.updated_at.isoformat(),
+                 0, "{}"),
+            )
+            conn.commit()
 
         self._cache[key] = session
         return session
 
     def _load(self, key: str) -> Session | None:
-        """Load a session from disk."""
-        path = self._get_session_path(key)
-        if not path.exists():
-            legacy_path = self._get_legacy_session_path(key)
-            if legacy_path.exists():
-                try:
-                    shutil.move(str(legacy_path), str(path))
-                    logger.info("Migrated session {} from legacy path", key)
-                except Exception:
-                    logger.exception("Failed to migrate session {}", key)
-
-        if not path.exists():
+        conn = self._get_conn()
+        row = conn.execute("SELECT * FROM sessions WHERE key = ?", (key,)).fetchone()
+        if row is None:
             return None
 
-        try:
-            messages = []
-            metadata = {}
-            created_at = None
-            last_consolidated = 0
+        msg_rows = conn.execute(
+            "SELECT role, content, timestamp, extra FROM messages"
+            " WHERE session_key = ? ORDER BY id",
+            (key,),
+        ).fetchall()
 
-            with open(path, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
+        messages: list[dict[str, Any]] = []
+        for mr in msg_rows:
+            msg: dict[str, Any] = {
+                "role": mr["role"],
+                "content": mr["content"],
+                "timestamp": mr["timestamp"],
+            }
+            extra = json.loads(mr["extra"]) if mr["extra"] and mr["extra"] != "{}" else {}
+            msg.update(extra)
+            messages.append(msg)
 
-                    data = json.loads(line)
-
-                    if data.get("_type") == "metadata":
-                        metadata = data.get("metadata", {})
-                        created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
-                        last_consolidated = data.get("last_consolidated", 0)
-                    else:
-                        messages.append(data)
-
-            return Session(
-                key=key,
-                messages=messages,
-                created_at=created_at or datetime.now(),
-                metadata=metadata,
-                last_consolidated=last_consolidated
-            )
-        except Exception as e:
-            logger.warning("Failed to load session {}: {}", key, e)
-            return None
+        return Session(
+            key=key,
+            messages=messages,
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+            metadata=json.loads(row["metadata"]) if row["metadata"] else {},
+            last_consolidated=row["last_consolidated"],
+            _db_message_count=len(messages),
+        )
 
     def save(self, session: Session) -> None:
-        """Save a session to disk."""
-        path = self._get_session_path(session.key)
+        conn = self._get_conn()
+        with conn:  # auto-commit / rollback transaction
+            # Detect clear(): messages were wiped but DB still has rows
+            if len(session.messages) < session._db_message_count:
+                conn.execute("DELETE FROM messages WHERE session_key = ?", (session.key,))
+                session._db_message_count = 0
 
-        with open(path, "w", encoding="utf-8") as f:
-            metadata_line = {
-                "_type": "metadata",
-                "key": session.key,
-                "created_at": session.created_at.isoformat(),
-                "updated_at": session.updated_at.isoformat(),
-                "metadata": session.metadata,
-                "last_consolidated": session.last_consolidated
-            }
-            f.write(json.dumps(metadata_line, ensure_ascii=False) + "\n")
-            for msg in session.messages:
-                f.write(json.dumps(msg, ensure_ascii=False) + "\n")
+            # Append only new messages
+            new_messages = session.messages[session._db_message_count:]
+            for msg in new_messages:
+                extra = {k: msg[k] for k in _EXTRA_KEYS if k in msg}
+                conn.execute(
+                    "INSERT INTO messages (session_key, role, content, timestamp, extra)"
+                    " VALUES (?, ?, ?, ?, ?)",
+                    (
+                        session.key,
+                        msg["role"],
+                        msg.get("content"),
+                        msg.get("timestamp", datetime.now().isoformat()),
+                        json.dumps(extra, ensure_ascii=False) if extra else "{}",
+                    ),
+                )
 
+            conn.execute(
+                "UPDATE sessions SET updated_at = ?, last_consolidated = ?, metadata = ?"
+                " WHERE key = ?",
+                (
+                    session.updated_at.isoformat(),
+                    session.last_consolidated,
+                    json.dumps(session.metadata, ensure_ascii=False),
+                    session.key,
+                ),
+            )
+
+            # Set title from first user message if not set
+            if new_messages:
+                first_user = next((m for m in new_messages if m.get("role") == "user"), None)
+                if first_user and first_user.get("content"):
+                    title = first_user["content"][:60]
+                    conn.execute(
+                        "UPDATE sessions SET title = ? WHERE key = ? AND title IS NULL",
+                        (title, session.key),
+                    )
+
+        session._db_message_count = len(session.messages)
         self._cache[session.key] = session
 
     def invalidate(self, key: str) -> None:
-        """Remove a session from the in-memory cache."""
+        """Remove a session from the in-memory cache (forces reload from DB next time)."""
         self._cache.pop(key, None)
 
-    def list_sessions(self) -> list[dict[str, Any]]:
+    def list_sessions(self, user_id: str | None = None) -> list[dict[str, Any]]:
+        """List sessions, optionally filtered by user_id, newest first."""
+        conn = self._get_conn()
+        query = """
+            SELECT s.key, s.user_id, s.title, s.created_at, s.updated_at,
+                   COUNT(m.id) as message_count
+            FROM sessions s
+            LEFT JOIN messages m ON m.session_key = s.key
+            {where}
+            GROUP BY s.key
+            ORDER BY s.updated_at DESC
         """
-        List all sessions.
+        if user_id:
+            rows = conn.execute(
+                query.format(where="WHERE s.user_id = ?"), (user_id,)
+            ).fetchall()
+        else:
+            rows = conn.execute(query.format(where="")).fetchall()
+        return [dict(r) for r in rows]
 
-        Returns:
-            List of session info dicts.
+    def create_user(self, user_id: str) -> dict[str, Any]:
+        """Create a new user. Returns the user dict. No-op if already exists."""
+        now = datetime.now().isoformat()
+        conn = self._get_conn()
+        conn.execute(
+            "INSERT OR IGNORE INTO users (user_id, created_at) VALUES (?, ?)",
+            (user_id, now),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        return dict(row)
+
+    def list_users(self) -> list[dict[str, Any]]:
+        """List all users ordered by creation time."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT user_id, created_at FROM users ORDER BY created_at ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_session(self, key: str) -> None:
+        """Delete a session and all its messages."""
+        conn = self._get_conn()
+        with conn:
+            conn.execute("DELETE FROM messages WHERE session_key = ?", (key,))
+            conn.execute("DELETE FROM sessions WHERE key = ?", (key,))
+        self._cache.pop(key, None)
+
+    def get_session_messages(self, key: str) -> list[dict[str, Any]]:
+        """Return full message sequence for a session (for display/replay, not LLM history).
+
+        Returns all roles including tool results so the frontend can reconstruct
+        thinking sections (tool calls are stored in the extra JSON column).
         """
-        sessions = []
-
-        for path in self.sessions_dir.glob("*.jsonl"):
-            try:
-                # Read just the metadata line
-                with open(path, encoding="utf-8") as f:
-                    first_line = f.readline().strip()
-                    if first_line:
-                        data = json.loads(first_line)
-                        if data.get("_type") == "metadata":
-                            key = data.get("key") or path.stem.replace("_", ":", 1)
-                            sessions.append({
-                                "key": key,
-                                "created_at": data.get("created_at"),
-                                "updated_at": data.get("updated_at"),
-                                "path": str(path)
-                            })
-            except Exception:
-                continue
-
-        return sorted(sessions, key=lambda x: x.get("updated_at", ""), reverse=True)
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT role, content, extra FROM messages WHERE session_key = ? ORDER BY id",
+            (key,),
+        ).fetchall()
+        result = []
+        for r in rows:
+            msg: dict[str, Any] = {"role": r["role"], "content": r["content"]}
+            extra = json.loads(r["extra"]) if r["extra"] and r["extra"] != "{}" else {}
+            if extra.get("tool_calls"):
+                msg["tool_calls"] = extra["tool_calls"]
+            if extra.get("tool_call_id"):
+                msg["tool_call_id"] = extra["tool_call_id"]
+            result.append(msg)
+        return result

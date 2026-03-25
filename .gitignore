@@ -21,7 +21,6 @@ poetry.lock
 .pytest_cache/
 botpy.log
 config.json
-uv.lock
 .DS_Store
 .idea/
 cron/jobs.json

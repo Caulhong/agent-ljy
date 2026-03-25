@@ -176,7 +176,7 @@ class AgentLoop:
             val = next(iter(args.values()), None) if isinstance(args, dict) else None
             if not isinstance(val, str):
                 return tc.name
-            return f'{tc.name}("{val[:40]}…")' if len(val) > 40 else f'{tc.name}("{val}")'
+            return f'{tc.name}("{val}")'
         return ", ".join(_fmt(tc) for tc in tool_calls)
 
     async def _run_agent_loop(
@@ -364,6 +364,7 @@ class AgentLoop:
             messages = self.context.build_messages(
                 history=history,
                 current_message=msg.content, channel=channel, chat_id=chat_id,
+                user_id=self._extract_user_id(key),
             )
             final_content, _, all_msgs = await self._run_agent_loop(messages)
             self._save_turn(session, all_msgs, 1 + len(history))
@@ -440,6 +441,7 @@ class AgentLoop:
             current_message=msg.content,
             media=msg.media if msg.media else None,
             channel=msg.channel, chat_id=msg.chat_id,
+            user_id=self._extract_user_id(key),
         )
 
         async def _bus_progress(content: str, *, tool_hint: bool = False) -> None:
@@ -505,9 +507,24 @@ class AgentLoop:
             session.messages.append(entry)
         session.updated_at = datetime.now()
 
+    @staticmethod
+    def _extract_user_id(session_key: str) -> str | None:
+        """Extract user_id from session key for http/cli channels only.
+
+        http:alice:tab1  → "alice"
+        cli:alice        → "alice"
+        cron:job123      → None  (not a user channel)
+        heartbeat        → None
+        """
+        parts = session_key.split(":", 2)
+        if len(parts) >= 2 and parts[0] in ("http", "cli") and parts[1]:
+            return parts[1]
+        return None
+
     async def _consolidate_memory(self, session, archive_all: bool = False) -> bool:
         """Delegate to MemoryStore.consolidate(). Returns True on success."""
-        return await MemoryStore(self.workspace).consolidate(
+        user_id = self._extract_user_id(session.key)
+        return await MemoryStore(self.workspace, user_id).consolidate(
             session, self.provider, self.model,
             archive_all=archive_all, memory_window=self.memory_window,
         )

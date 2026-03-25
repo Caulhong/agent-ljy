@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
+from nanobot.session.manager import SessionManager
 
 
 @dataclass
@@ -33,13 +34,15 @@ class HttpApiConfig:
 class ChatRequest(BaseModel):
     user_id: str
     message: str
+    session_id: str = "default"
 
 
 class HttpApiChannel(BaseChannel):
     name = "http"
 
-    def __init__(self, config: HttpApiConfig, bus: MessageBus):
+    def __init__(self, config: HttpApiConfig, bus: MessageBus, session_manager: SessionManager | None = None):
         super().__init__(config, bus)
+        self._session_manager = session_manager
         # Map request_id -> asyncio.Queue to correlate responses
         self._pending: dict[str, asyncio.Queue[OutboundMessage]] = {}
         self._server: uvicorn.Server | None = None
@@ -68,11 +71,11 @@ class HttpApiChannel(BaseChannel):
             if not req.message.strip():
                 raise HTTPException(status_code=400, detail="message is required")
 
-            response = await self._process(req.user_id.strip(), req.message.strip())
+            response = await self._process(req.user_id.strip(), req.message.strip(), req.session_id.strip())
             return {
                 "user_id": req.user_id,
                 "message": response,
-                "session_key": f"http:{req.user_id}",
+                "session_key": f"http:{req.user_id}:{req.session_id}",
             }
 
         @app.post("/api/chat/stream")
@@ -84,7 +87,7 @@ class HttpApiChannel(BaseChannel):
                 raise HTTPException(status_code=400, detail="message is required")
 
             return StreamingResponse(
-                self._stream(req.user_id.strip(), req.message.strip()),
+                self._stream(req.user_id.strip(), req.message.strip(), req.session_id.strip()),
                 media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
@@ -92,9 +95,43 @@ class HttpApiChannel(BaseChannel):
                 },
             )
 
+        @app.get("/api/users")
+        async def list_users() -> list[dict]:
+            if not self._session_manager:
+                raise HTTPException(status_code=503, detail="Session manager not available")
+            return self._session_manager.list_users()
+
+        @app.post("/api/users")
+        async def create_user(body: dict) -> dict:
+            if not self._session_manager:
+                raise HTTPException(status_code=503, detail="Session manager not available")
+            user_id = (body.get("user_id") or "").strip()
+            if not user_id:
+                raise HTTPException(status_code=400, detail="user_id is required")
+            return self._session_manager.create_user(user_id)
+
+        @app.get("/api/sessions")
+        async def list_sessions(user_id: str) -> list[dict]:
+            if not self._session_manager:
+                raise HTTPException(status_code=503, detail="Session manager not available")
+            return self._session_manager.list_sessions(user_id=user_id)
+
+        @app.get("/api/sessions/messages")
+        async def get_messages(key: str) -> list[dict]:
+            if not self._session_manager:
+                raise HTTPException(status_code=503, detail="Session manager not available")
+            return self._session_manager.get_session_messages(key)
+
+        @app.delete("/api/sessions")
+        async def delete_session(key: str) -> dict:
+            if not self._session_manager:
+                raise HTTPException(status_code=503, detail="Session manager not available")
+            self._session_manager.delete_session(key)
+            return {"ok": True}
+
         return app
 
-    async def _process(self, user_id: str, message: str, timeout: float = 180.0) -> str:
+    async def _process(self, user_id: str, message: str, session_id: str = "default", timeout: float = 180.0) -> str:
         """Publish message to bus and wait for the final response."""
         request_id = str(uuid.uuid4())
         queue: asyncio.Queue[OutboundMessage] = asyncio.Queue()
@@ -105,7 +142,7 @@ class HttpApiChannel(BaseChannel):
                 sender_id=user_id,
                 chat_id=request_id,
                 content=message,
-                session_key=f"http:{user_id}",
+                session_key=f"http:{user_id}:{session_id}",
             )
             # Drain queue until we get a non-progress (final) message
             while True:
@@ -119,7 +156,7 @@ class HttpApiChannel(BaseChannel):
             self._pending.pop(request_id, None)
 
     async def _stream(
-        self, user_id: str, message: str, timeout: float = 180.0
+        self, user_id: str, message: str, session_id: str = "default", timeout: float = 180.0
     ) -> AsyncGenerator[str, None]:
         """Publish message to bus and stream all outbound messages as SSE."""
         request_id = str(uuid.uuid4())
@@ -131,7 +168,7 @@ class HttpApiChannel(BaseChannel):
                 sender_id=user_id,
                 chat_id=request_id,
                 content=message,
-                session_key=f"http:{user_id}",
+                session_key=f"http:{user_id}:{session_id}",
             )
 
             while True:
@@ -139,7 +176,11 @@ class HttpApiChannel(BaseChannel):
                     msg = await asyncio.wait_for(queue.get(), timeout=timeout)
                     is_progress = msg.metadata.get("_progress", False)
                     data = json.dumps(
-                        {"content": msg.content, "done": not is_progress},
+                        {
+                            "content": msg.content,
+                            "done": not is_progress,
+                            "tool_hint": msg.metadata.get("_tool_hint", False),
+                        },
                         ensure_ascii=False,
                     )
                     yield f"data: {data}\n\n"

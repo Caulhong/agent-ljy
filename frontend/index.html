@@ -526,6 +526,93 @@
     30% { opacity: 1; transform: scale(1.1); }
   }
 
+  /* ── THINKING SECTION ── */
+  .think-section {
+    margin-left: 38px;
+    margin-bottom: 2px;
+    animation: fadeUp 0.2s ease both;
+  }
+
+  /* Single-line toggle header */
+  .think-toggle {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-muted);
+    cursor: pointer; padding: 3px 0;
+    user-select: none; background: none; border: none;
+    max-width: 100%; flex-wrap: wrap; row-gap: 3px;
+  }
+  .think-toggle:hover { color: var(--text-dim); }
+
+  .think-chevron {
+    display: inline-block; font-size: 9px;
+    transition: transform 0.2s; opacity: 0.5; flex-shrink: 0;
+  }
+  .think-toggle.open .think-chevron { transform: rotate(90deg); }
+
+  .think-label { color: var(--text-muted); flex-shrink: 0; }
+
+  /* Tool chips shown inline in the header */
+  .think-chip {
+    display: inline-block;
+    max-width: 220px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    vertical-align: middle;
+    font-size: 10.5px; font-family: 'DM Mono', monospace;
+    color: var(--accent); opacity: 0.8;
+    background: rgba(74,158,255,0.07);
+    border: 1px solid rgba(74,158,255,0.18);
+    border-radius: 4px; padding: 1px 6px;
+    cursor: default;
+  }
+  .think-sep { color: var(--text-muted); opacity: 0.4; }
+
+  /* Expandable body */
+  .think-body {
+    overflow: hidden; max-height: 0;
+    transition: max-height 0.25s ease;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px; margin-top: 5px;
+  }
+  .think-body.open { max-height: 400px; overflow-y: auto; }
+
+  .think-body-row {
+    border-bottom: 1px solid var(--border);
+  }
+  .think-body-row:last-child { border-bottom: none; }
+
+  .think-body-row-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 12px;
+    font-size: 11.5px; font-family: 'DM Mono', monospace;
+    color: var(--accent); line-height: 1.5;
+    cursor: default;
+  }
+  .think-body-row.has-detail .think-body-row-header {
+    cursor: pointer;
+  }
+  .think-body-row.has-detail .think-body-row-header:hover {
+    background: var(--surface-3);
+  }
+  .think-body-icon { flex-shrink: 0; opacity: 0.6; }
+  .think-body-row-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .think-expand-icon {
+    font-size: 9px; opacity: 0.4; flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .think-body-row.open .think-expand-icon { transform: rotate(90deg); }
+
+  .think-detail {
+    display: none;
+    padding: 6px 12px 8px 30px;
+    font-size: 12px; font-family: 'DM Sans', sans-serif;
+    color: var(--text-muted); line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.15);
+  }
+  .think-body-row.open .think-detail { display: block; }
+
   /* ── INPUT AREA ── */
   .input-area {
     padding: 16px 24px 20px;
@@ -704,6 +791,101 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
+  /* ── USER PICKER ── */
+  .user-picker-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.15s ease;
+  }
+
+  .user-picker {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    width: 440px;
+    max-width: calc(100vw - 32px);
+    animation: scaleIn 0.15s ease;
+  }
+
+  .user-picker-header {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  }
+
+  .user-list {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    margin-bottom: 20px;
+    min-height: 60px;
+  }
+
+  .user-chip {
+    display: flex; flex-direction: column; align-items: center;
+    width: 90px; padding: 12px 8px;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: inherit;
+  }
+
+  .user-chip:hover {
+    border-color: var(--border-active);
+    background: var(--accent-glow);
+  }
+
+  .user-chip.selected {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  .user-chip-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--navy-light), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    color: white;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+  }
+
+  .user-chip-name {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    width: 100%;
+  }
+
+  .user-picker-divider {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 4px 0 16px;
+    position: relative;
+  }
+
+  .user-picker-divider::before,
+  .user-picker-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    height: 1px;
+    background: var(--border);
+    width: 42%;
+  }
+
+  .user-picker-divider::before { left: 0; }
+  .user-picker-divider::after { right: 0; }
+
+  .new-user-row {
+    display: flex; gap: 8px;
+  }
+
   /* ── RESPONSIVE ── */
   @media (max-width: 640px) {
     .sidebar { display: none; }
@@ -731,7 +913,7 @@
   <div class="sessions-list" id="sessionsList"></div>
 
   <div class="sidebar-footer">
-    <div class="user-row" onclick="showSettings()">
+    <div class="user-row" onclick="showUserPicker(true)">
       <div class="user-avatar" id="userAvatarSidebar">?</div>
       <div class="user-id-text" id="userIdDisplay">Loading…</div>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" opacity="0.4">
@@ -791,6 +973,29 @@
   </div>
 </main>
 
+<!-- USER PICKER MODAL -->
+<div class="user-picker-overlay" id="userPickerModal" style="display:none">
+  <div class="user-picker">
+    <div class="user-picker-header">
+      <div>
+        <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:600;margin-bottom:4px">Who's using Nanobot?</h3>
+        <p style="font-size:13px;color:var(--text-dim);margin:0">Select a profile or create a new one</p>
+      </div>
+      <button class="icon-btn" id="userPickerClose" onclick="hideUserPicker()" style="display:none;flex-shrink:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="margin-top:20px">
+      <div class="user-list" id="userPickerList"></div>
+      <div class="user-picker-divider">or</div>
+      <div class="new-user-row">
+        <input class="modal-input" id="newUserInput" type="text" placeholder="Enter a name…" style="margin:0;flex:1" onkeydown="if(event.key==='Enter')createNewUser()">
+        <button class="btn btn-primary" onclick="createNewUser()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settingsModal" style="display:none" onclick="closeModal(event)">
   <div class="modal">
@@ -813,7 +1018,6 @@
     <input class="modal-input" id="apiUrlInput" type="text" placeholder="http://localhost:8000">
     <input class="modal-input" id="userIdInput" type="text" placeholder="Enter user ID">
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="regenerateUserId()">Regenerate ID</button>
       <button class="btn btn-ghost" onclick="closeSettingsModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveSettings()">Save</button>
     </div>
@@ -823,10 +1027,20 @@
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────
 let API_BASE = localStorage.getItem('nanobot_api_url') || 'http://localhost:8000';
-let userId = localStorage.getItem('nanobot_user_id') || generateId();
-let sessions = JSON.parse(localStorage.getItem('nanobot_sessions') || '[]');
+let userId = localStorage.getItem('nanobot_user_id') || null;
+let sessions = [];  // loaded from API
 let currentSessionId = null;
+let currentMessages = [];  // messages for current session, loaded from API
 let isStreaming = false;
+
+async function apiFetch(path, options = {}) {
+  const resp = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+  return resp.json();
+}
 
 // ─── INIT ────────────────────────────────────────────────────────────
 function generateId() {
@@ -834,13 +1048,82 @@ function generateId() {
 }
 
 function init() {
-  localStorage.setItem('nanobot_user_id', userId);
-  updateUserDisplay();
-  renderSessions();
-  checkHealth();
   document.getElementById('messageInput').addEventListener('input', function() {
     document.getElementById('sendBtn').disabled = !this.value.trim() || isStreaming;
   });
+  checkHealth();
+  if (!userId) {
+    showUserPicker(false);
+  } else {
+    onUserSelected();
+  }
+}
+
+async function onUserSelected() {
+  updateUserDisplay();
+  await loadSessions();
+  // Restore last session for this user
+  const savedKey = localStorage.getItem('nanobot_last_session_' + userId);
+  const exists = savedKey && sessions.find(s => s.key === savedKey);
+  if (exists) {
+    await loadSession(savedKey);
+  }
+}
+
+async function showUserPicker(canDismiss) {
+  await renderUserList();
+  document.getElementById('userPickerClose').style.display = canDismiss ? 'flex' : 'none';
+  document.getElementById('userPickerModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('newUserInput').focus(), 100);
+}
+
+function hideUserPicker() {
+  document.getElementById('userPickerModal').style.display = 'none';
+}
+
+async function renderUserList() {
+  const list = document.getElementById('userPickerList');
+  list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Loading…</div>';
+  try {
+    const users = await apiFetch('/api/users');
+    if (!users.length) {
+      list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">No profiles yet — create one below.</div>';
+      return;
+    }
+    list.innerHTML = users.map(u => `
+      <button class="user-chip ${u.user_id === userId ? 'selected' : ''}" onclick="selectUser('${escHtml(u.user_id)}')">
+        <div class="user-chip-avatar">${escHtml(u.user_id.slice(0,2).toUpperCase())}</div>
+        <div class="user-chip-name">${escHtml(u.user_id)}</div>
+      </button>
+    `).join('');
+  } catch {
+    list.innerHTML = '<div style="font-size:12px;color:var(--error);padding:8px 0">Failed to load users.</div>';
+  }
+}
+
+async function selectUser(uid) {
+  userId = uid;
+  localStorage.setItem('nanobot_user_id', uid);
+  hideUserPicker();
+  currentSessionId = null;
+  currentMessages = [];
+  // Reset view before loading; onUserSelected will restore last session if any
+  document.getElementById('messagesInner').innerHTML = buildEmptyState();
+  document.getElementById('topbarTitle').textContent = 'New conversation';
+  await onUserSelected();
+}
+
+async function createNewUser() {
+  const input = document.getElementById('newUserInput');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
+  input.value = '';
+  try {
+    await apiFetch('/api/users', { method: 'POST', body: JSON.stringify({ user_id: name }) });
+    await selectUser(name);
+  } catch(e) {
+    alert('Failed to create user: ' + e.message);
+  }
 }
 
 // ─── HEALTH CHECK ────────────────────────────────────────────────────
@@ -859,62 +1142,76 @@ async function checkHealth() {
 }
 
 // ─── SESSIONS ────────────────────────────────────────────────────────
-function newSession() {
-  const sid = Date.now().toString();
-  const session = { id: sid, title: 'New conversation', messages: [], createdAt: Date.now() };
-  sessions.unshift(session);
-  saveSessions();
-  loadSession(sid);
-}
-
-function loadSession(sid) {
-  currentSessionId = sid;
-  const session = sessions.find(s => s.id === sid);
-  if (!session) return;
-  document.getElementById('topbarTitle').textContent = session.title;
-  renderMessages(session.messages);
+async function loadSessions() {
+  if (!userId) return;
+  try {
+    sessions = await apiFetch(`/api/sessions?user_id=${encodeURIComponent(userId)}`);
+  } catch {
+    sessions = [];
+  }
   renderSessions();
 }
 
-function deleteSession(sid, e) {
+function newSession() {
+  // Generate a new session ID; backend creates the DB row on first message
+  currentSessionId = Date.now().toString();
+  // Store full key so it matches the sessions list after refresh
+  localStorage.setItem('nanobot_last_session_' + userId, `http:${userId}:${currentSessionId}`);
+  currentMessages = [];
+  document.getElementById('messagesInner').innerHTML = buildEmptyState();
+  document.getElementById('topbarTitle').textContent = 'New conversation';
+  renderSessions();
+}
+
+async function loadSession(sid) {
+  currentSessionId = sid;
+  if (userId) localStorage.setItem('nanobot_last_session_' + userId, sid);
+  const session = sessions.find(s => s.key === sid);
+  document.getElementById('topbarTitle').textContent = session?.title || 'Conversation';
+  renderSessions();
+  // Fetch messages from API
+  try {
+    currentMessages = await apiFetch(`/api/sessions/messages?key=${encodeURIComponent(sid)}`);
+  } catch {
+    currentMessages = [];
+  }
+  renderMessages(currentMessages);
+}
+
+async function deleteSession(sid, e) {
   e.stopPropagation();
-  sessions = sessions.filter(s => s.id !== sid);
-  saveSessions();
+  try {
+    await apiFetch(`/api/sessions?key=${encodeURIComponent(sid)}`, { method: 'DELETE' });
+  } catch { /* ignore */ }
+  sessions = sessions.filter(s => s.key !== sid);
   if (currentSessionId === sid) {
     currentSessionId = null;
+    currentMessages = [];
     document.getElementById('topbarTitle').textContent = 'New conversation';
     document.getElementById('messagesInner').innerHTML = buildEmptyState();
   }
   renderSessions();
 }
 
-function saveSessions() {
-  // keep last 50 sessions, trim messages to last 100 per session for storage
-  const toSave = sessions.slice(0, 50).map(s => ({
-    ...s,
-    messages: s.messages.slice(-100)
-  }));
-  localStorage.setItem('nanobot_sessions', JSON.stringify(toSave));
-}
-
-function currentSession() {
-  return sessions.find(s => s.id === currentSessionId);
-}
-
 function renderSessions() {
   const list = document.getElementById('sessionsList');
-  if (!sessions.length) {
+  if (!sessions.length && !currentSessionId) {
     list.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--text-muted)">No conversations yet</div>';
     return;
   }
-  list.innerHTML = sessions.map(s => `
-    <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="loadSession('${s.id}')">
-      <div class="session-icon">${s.id === currentSessionId ? '💬' : '🗒'}</div>
+  // Include unsaved new session at top if in progress
+  const items = [...sessions];
+  if (currentSessionId && !sessions.find(s => s.key === currentSessionId)) {
+    items.unshift({ key: currentSessionId, title: 'New conversation', message_count: 0 });
+  }
+  list.innerHTML = items.map(s => `
+    <div class="session-item ${s.key === currentSessionId ? 'active' : ''}" onclick="loadSession('${escHtml(s.key)}')">
+      <div class="session-icon">${s.key === currentSessionId ? '💬' : '🗒'}</div>
       <div class="session-label">
-        <div class="session-name">${escHtml(s.title)}</div>
-        <div class="session-meta">${s.messages.length} msg${s.messages.length !== 1 ? 's' : ''}</div>
+        <div class="session-name">${escHtml(s.title || 'New conversation')}</div>
+        <div class="session-meta">${s.message_count || 0} msg${(s.message_count || 0) !== 1 ? 's' : ''}</div>
       </div>
-      <button class="session-delete" onclick="deleteSession('${s.id}', event)" title="Delete">
+      <button class="session-delete" onclick="deleteSession('${escHtml(s.key)}', event)" title="Delete">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -944,10 +1241,108 @@ function renderMessages(messages) {
     inner.innerHTML = buildEmptyState();
     return;
   }
-  inner.innerHTML = messages.map(m => buildMessageHtml(m.role, m.content, m.error)).join('');
+
+  // Group into turns: each user message starts a new turn.
+  // A turn may contain intermediate assistant+tool pairs before the final assistant.
+  const turns = [];
+  let cur = null;
+  for (const m of messages) {
+    if (m.role === 'user') {
+      if (cur) turns.push(cur);
+      cur = { user: m, steps: [], final: null };
+    } else if (m.role === 'assistant' && m.tool_calls?.length) {
+      // Intermediate assistant: has tool calls — becomes a thinking step
+      if (cur) cur.steps.push({ precedingText: m.content || '', toolCalls: m.tool_calls });
+    } else if (m.role === 'assistant') {
+      // Final assistant response (no tool_calls)
+      if (cur) cur.final = m;
+    }
+    // tool role (results) intentionally ignored for display
+  }
+  if (cur) turns.push(cur);
+
+  const html = turns.map(turn => {
+    let out = '';
+    // User bubble
+    if (turn.user) out += buildMessageHtml('user', turn.user.content);
+    // Thinking section (if any tool calls happened)
+    if (turn.steps.length) out += buildThinkHtml(turn.steps);
+    // Final assistant bubble
+    if (turn.final) out += buildMessageHtml('assistant', turn.final.content);
+    return out;
+  }).join('');
+
+  inner.innerHTML = html;
   inner.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+
+  // Wire up toggle clicks for historical thinking sections
+  inner.querySelectorAll('.think-section').forEach(sec => {
+    const tog = sec.querySelector('.think-toggle');
+    const bod = sec.querySelector('.think-body');
+    tog.addEventListener('click', () => {
+      tog.classList.toggle('open');
+      bod.classList.toggle('open');
+    });
+    // Wire row expand clicks
+    sec.querySelectorAll('.think-body-row.has-detail').forEach(row => {
+      row.querySelector('.think-body-row-header').addEventListener('click', () => {
+        row.classList.toggle('open');
+      });
+    });
+  });
+
   scrollToBottom(false);
 }
+
+function buildThinkHtml(steps) {
+  // steps: [{precedingText, toolCalls: [{id, type, function: {name, arguments}}]}]
+  const chips = steps.flatMap(s => s.toolCalls).map(tc => {
+    const hint = formatToolHint(tc);
+    return `<span class="think-chip" title="${escHtml(hint)}">⚙ ${escHtml(hint)}</span>`;
+  }).join('<span class="think-sep">·</span>');
+
+  const toolCount = steps.flatMap(s => s.toolCalls).length;
+  const label = `Used ${toolCount} tool${toolCount > 1 ? 's' : ''}`;
+
+  const rows = steps.flatMap(s =>
+    s.toolCalls.map(tc => {
+      const hint = formatToolHint(tc);
+      const hasDetail = s.precedingText && s.precedingText.trim();
+      return `<div class="think-body-row${hasDetail ? ' has-detail' : ''}">
+        <div class="think-body-row-header">
+          <span class="think-body-icon">⚙</span>
+          <span class="think-body-row-text">${escHtml(hint)}</span>
+          ${hasDetail ? '<span class="think-expand-icon">▶</span>' : ''}
+        </div>
+        ${hasDetail ? `<div class="think-detail">${escHtml(s.precedingText.trim())}</div>` : ''}
+      </div>`;
+    })
+  ).join('');
+
+  return `<div class="think-section">
+    <button class="think-toggle">
+      <span class="think-chevron">▶</span>
+      <span class="think-label">${escHtml(label)}</span>
+      <span class="think-chips">${chips}</span>
+    </button>
+    <div class="think-body">${rows}</div>
+  </div>`;
+}
+
+function formatToolHint(tc) {
+  // Returns the full hint string — CSS handles visual truncation, title attr shows full text
+  const name = tc.function?.name || tc.name || '?';
+  try {
+    const args = typeof tc.function?.arguments === 'string'
+      ? JSON.parse(tc.function.arguments)
+      : (tc.function?.arguments || {});
+    const val = Object.values(args)[0];
+    if (typeof val === 'string') return `${name}("${val}")`;
+  } catch {}
+  return name;
+}
+
+// currentMessages is the authoritative in-memory list; no localStorage persistence needed
 
 function buildMessageHtml(role, content, isError = false) {
   const initials = role === 'user' ? (userId.slice(0,2).toUpperCase()) : 'NB';
@@ -987,9 +1382,7 @@ function renderMarkdown(text) {
 }
 
 function addMessage(role, content, isError = false) {
-  const session = currentSession();
-  if (!session) return;
-  session.messages.push({ role, content, error: isError });
+  currentMessages.push({ role, content, error: isError });
 
   const inner = document.getElementById('messagesInner');
   const empty = document.getElementById('emptyState');
@@ -1002,12 +1395,19 @@ function addMessage(role, content, isError = false) {
   node.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
   scrollToBottom();
 
-  if (role === 'user' && session.messages.filter(m=>m.role==='user').length === 1) {
-    session.title = content.slice(0, 40) + (content.length > 40 ? '…' : '');
-    document.getElementById('topbarTitle').textContent = session.title;
-    renderSessions();
+  // Update session title in local list after first user message
+  if (role === 'user' && currentSessionId) {
+    const existing = sessions.find(s => s.key === currentSessionId);
+    const userMsgs = currentMessages.filter(m => m.role === 'user');
+    if (userMsgs.length === 1) {
+      const title = content.slice(0, 60) + (content.length > 60 ? '…' : '');
+      if (existing) {
+        existing.title = title;
+      }
+      document.getElementById('topbarTitle').textContent = title;
+      renderSessions();
+    }
   }
-  saveSessions();
 }
 
 function addTypingIndicator() {
@@ -1049,6 +1449,104 @@ function finalizeStreaming(content) {
   addMessage('assistant', content);
 }
 
+// ─── THINKING SECTION ─────────────────────────────────────────────────
+// Per-turn element references (no fixed IDs, so each turn gets its own section)
+let thinkSteps = [];
+let _thinkSection = null;
+let _thinkToggle = null;
+let _thinkBody = null;
+let _thinkChips = null;
+let _thinkLabel = null;
+
+function _clearThinkRefs() {
+  _thinkSection = _thinkToggle = _thinkBody = _thinkChips = _thinkLabel = null;
+}
+
+function ensureThinkSection() {
+  if (_thinkSection) return _thinkSection;
+
+  const typing = document.getElementById('typingRow');
+  if (typing) typing.remove();
+
+  const inner = document.getElementById('messagesInner');
+  _thinkSection = document.createElement('div');
+  _thinkSection.className = 'think-section';
+  _thinkSection.innerHTML = `
+    <button class="think-toggle">
+      <span class="think-chevron">▶</span>
+      <span class="think-label">Thinking…</span>
+      <span class="think-chips"></span>
+    </button>
+    <div class="think-body"></div>
+  `;
+  _thinkToggle = _thinkSection.querySelector('.think-toggle');
+  _thinkBody   = _thinkSection.querySelector('.think-body');
+  _thinkChips  = _thinkSection.querySelector('.think-chips');
+  _thinkLabel  = _thinkSection.querySelector('.think-label');
+
+  // Capture refs in closure so old turns keep working after refs are cleared
+  const tog = _thinkToggle, bod = _thinkBody;
+  _thinkToggle.addEventListener('click', () => {
+    tog.classList.toggle('open');
+    bod.classList.toggle('open');
+  });
+
+  inner.appendChild(_thinkSection);
+  return _thinkSection;
+}
+
+function addThinkStep(content, isToolHint, precedingText) {
+  if (!content || !isToolHint) return;
+
+  thinkSteps.push({ type: 'tool', content });
+  ensureThinkSection();
+
+  // Chip in header with full-text tooltip
+  if (_thinkChips.children.length > 0) {
+    _thinkChips.insertAdjacentHTML('beforeend', '<span class="think-sep">·</span>');
+  }
+  const chip = document.createElement('span');
+  chip.className = 'think-chip';
+  chip.title = content;  // native tooltip for full text on hover
+  chip.textContent = '⚙ ' + content;
+  _thinkChips.appendChild(chip);
+
+  // Body row — expandable if there's preceding LLM text
+  const row = document.createElement('div');
+  const hasDetail = precedingText && precedingText.trim();
+  row.className = 'think-body-row' + (hasDetail ? ' has-detail' : '');
+  row.innerHTML = `
+    <div class="think-body-row-header">
+      <span class="think-body-icon">⚙</span>
+      <span class="think-body-row-text">${escHtml(content)}</span>
+      ${hasDetail ? '<span class="think-expand-icon">▶</span>' : ''}
+    </div>
+    ${hasDetail ? `<div class="think-detail">${escHtml(precedingText.trim())}</div>` : ''}
+  `;
+  if (hasDetail) {
+    row.querySelector('.think-body-row-header').addEventListener('click', () => {
+      row.classList.toggle('open');
+    });
+  }
+  _thinkBody.appendChild(row);
+  scrollToBottom();
+}
+
+function finalizeThinkSection() {
+  if (!_thinkSection) { _clearThinkRefs(); return; }
+
+  if (thinkSteps.length === 0) {
+    _thinkSection.remove();
+  } else {
+    _thinkLabel.textContent = `Used ${thinkSteps.length} tool${thinkSteps.length > 1 ? 's' : ''}`;
+    // Collapse (body stays in DOM, toggle still works via closure)
+    _thinkToggle.classList.remove('open');
+    _thinkBody.classList.remove('open');
+  }
+  // Clear refs so next turn creates a fresh section
+  _clearThinkRefs();
+}
+
 // ─── SEND ─────────────────────────────────────────────────────────────
 async function sendMessage() {
   const input = document.getElementById('messageInput');
@@ -1067,13 +1565,16 @@ async function sendMessage() {
   addMessage('user', text);
   addTypingIndicator();
 
-  let accumulated = '';
+  thinkSteps = [];
+  let finalContent = '';
+  let streamingAccum = '';
+  let thinkTextBuf = '';  // LLM text tokens preceding each tool call
 
   try {
     const resp = await fetch(`${API_BASE}/api/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, message: text }),
+      body: JSON.stringify({ user_id: userId, message: text, session_id: bareSessionId(currentSessionId) }),
     });
 
     if (!resp.ok) {
@@ -1096,8 +1597,21 @@ async function sendMessage() {
         try {
           const data = JSON.parse(line.slice(6));
           if (data.error) throw new Error(data.error);
-          accumulated += data.content || '';
-          updateStreamingBubble(accumulated);
+          if (data.done) {
+            finalContent = data.content || '';
+          } else if (data.tool_hint) {
+            // Tool call: show in thinking section with preceding LLM text as detail
+            addThinkStep(data.content || '', true, thinkTextBuf);
+            thinkTextBuf = '';
+            streamingAccum = '';
+            const sRow = document.getElementById('streamingRow');
+            if (sRow) sRow.remove();
+          } else {
+            // Streaming token: show live in response bubble + buffer for think detail
+            streamingAccum += data.content || '';
+            thinkTextBuf += data.content || '';
+            updateStreamingBubble(streamingAccum);
+          }
           if (data.done) break;
         } catch (e) {
           if (e.message !== 'timeout') throw e;
@@ -1105,13 +1619,16 @@ async function sendMessage() {
       }
     }
 
-    finalizeStreaming(accumulated);
+    finalizeThinkSection();
+    finalizeStreaming(finalContent);
 
   } catch (err) {
     const typing = document.getElementById('typingRow');
     const streaming = document.getElementById('streamingRow');
+    const thinking = document.getElementById('thinkSection');
     if (typing) typing.remove();
     if (streaming) streaming.remove();
+    if (thinking) thinking.remove();
     addMessage('assistant', `⚠ ${err.message || 'Connection failed. Is the server running?'}`, true);
     checkHealth();
   } finally {
@@ -1153,14 +1670,8 @@ function scrollToBottom(smooth = true) {
 }
 
 function clearCurrentChat() {
-  const session = currentSession();
-  if (!session) return;
-  session.messages = [];
-  session.title = 'New conversation';
-  document.getElementById('topbarTitle').textContent = session.title;
-  document.getElementById('messagesInner').innerHTML = buildEmptyState();
-  saveSessions();
-  renderSessions();
+  if (!currentSessionId) return;
+  deleteSession(currentSessionId, { stopPropagation: () => {} });
 }
 
 function copyCode(btn, code) {
@@ -1172,6 +1683,14 @@ function copyCode(btn, code) {
       btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`;
     }, 2000);
   });
+}
+
+// Strip "http:{userId}:" or "cli:{userId}:" prefix to get the bare session_id
+// e.g. "http:dqh:1774394942411" → "1774394942411"
+function bareSessionId(key) {
+  if (!key) return key;
+  const parts = key.split(':');
+  return parts.length >= 3 ? parts.slice(2).join(':') : key;
 }
 
 function escHtml(str) {
@@ -1204,22 +1723,12 @@ function closeModal(e) {
 
 function saveSettings() {
   const url = document.getElementById('apiUrlInput').value.trim();
-  const uid = document.getElementById('userIdInput').value.trim();
   if (url) {
     API_BASE = url.replace(/\/$/, '');
     localStorage.setItem('nanobot_api_url', API_BASE);
   }
-  if (uid) {
-    userId = uid;
-    localStorage.setItem('nanobot_user_id', userId);
-    updateUserDisplay();
-  }
   closeSettingsModal();
   checkHealth();
-}
-
-function regenerateUserId() {
-  document.getElementById('userIdInput').value = generateId();
 }
 
 // ─── BOOT ─────────────────────────────────────────────────────────────
