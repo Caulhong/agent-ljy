@@ -6,7 +6,7 @@ import asyncio
 import json
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator
+from typing import Optional, Any, AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -40,12 +40,12 @@ class ChatRequest(BaseModel):
 class HttpApiChannel(BaseChannel):
     name = "http"
 
-    def __init__(self, config: HttpApiConfig, bus: MessageBus, session_manager: SessionManager | None = None):
+    def __init__(self, config: HttpApiConfig, bus: MessageBus, session_manager: Optional[SessionManager] = None):
         super().__init__(config, bus)
         self._session_manager = session_manager
         # Map request_id -> asyncio.Queue to correlate responses
         self._pending: dict[str, asyncio.Queue[OutboundMessage]] = {}
-        self._server: uvicorn.Server | None = None
+        self._server: Optional[uvicorn.Server] = None
         self.app = self._build_app()
 
     def _build_app(self) -> FastAPI:

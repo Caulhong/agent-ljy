@@ -1,10 +1,12 @@
 """Subagent manager for background task execution."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Optional, Any
 
 from loguru import logger
 
@@ -26,13 +28,13 @@ class SubagentManager:
         provider: LLMProvider,
         workspace: Path,
         bus: MessageBus,
-        model: str | None = None,
+        model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        reasoning_effort: str | None = None,
-        brave_api_key: str | None = None,
-        web_proxy: str | None = None,
-        exec_config: "ExecToolConfig | None" = None,
+        reasoning_effort: Optional[str] = None,
+        brave_api_key: Optional[str] = None,
+        web_proxy: Optional[str] = None,
+        exec_config: "Optional[ExecToolConfig]" = None,
         restrict_to_workspace: bool = False,
     ):
         from nanobot.config.schema import ExecToolConfig
@@ -53,10 +55,10 @@ class SubagentManager:
     async def spawn(
         self,
         task: str,
-        label: str | None = None,
+        label: Optional[str] = None,
         origin_channel: str = "cli",
         origin_chat_id: str = "direct",
-        session_key: str | None = None,
+        session_key: Optional[str] = None,
     ) -> str:
         """Spawn a subagent to execute a task in the background."""
         task_id = str(uuid.uuid4())[:8]
@@ -118,7 +120,7 @@ class SubagentManager:
             # Run agent loop (limited iterations)
             max_iterations = 15
             iteration = 0
-            final_result: str | None = None
+            final_result: Optional[str] = None
 
             while iteration < max_iterations:
                 iteration += 1

@@ -1,6 +1,8 @@
 """Spawn tool for creating background subagents."""
 
-from typing import TYPE_CHECKING, Any
+from __future__ import annotations
+
+from typing import Optional, TYPE_CHECKING, Any
 
 from nanobot.agent.tools.base import Tool
 
@@ -52,7 +54,7 @@ class SpawnTool(Tool):
             "required": ["task"],
         }
 
-    async def execute(self, task: str, label: str | None = None, **kwargs: Any) -> str:
+    async def execute(self, task: str, label: Optional[str] = None, **kwargs: Any) -> str:
         """Spawn a subagent to execute the given task."""
         return await self._manager.spawn(
             task=task,

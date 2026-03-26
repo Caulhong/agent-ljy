@@ -1,11 +1,13 @@
 """Session management for conversation history — SQLite backend."""
 
+from __future__ import annotations
+
 import json
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Optional, Any
 
 from loguru import logger
 
@@ -109,7 +111,7 @@ class SessionManager:
     def __init__(self, workspace: Path):
         self.workspace = workspace
         self._db_path = workspace / "sessions.db"
-        self._conn: sqlite3.Connection | None = None
+        self._conn: Optional[sqlite3.Connection] = None
         self._cache: dict[str, Session] = {}
         self._init_db()
 
@@ -131,7 +133,7 @@ class SessionManager:
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _extract_user_id(key: str) -> str | None:
+    def _extract_user_id(key: str) -> Optional[str]:
         parts = key.split(":", 2)
         if len(parts) >= 2 and parts[0] in ("http", "cli") and parts[1]:
             return parts[1]
@@ -163,7 +165,7 @@ class SessionManager:
         self._cache[key] = session
         return session
 
-    def _load(self, key: str) -> Session | None:
+    def _load(self, key: str) -> Optional[Session]:
         conn = self._get_conn()
         row = conn.execute("SELECT * FROM sessions WHERE key = ?", (key,)).fetchone()
         if row is None:
@@ -248,7 +250,7 @@ class SessionManager:
         """Remove a session from the in-memory cache (forces reload from DB next time)."""
         self._cache.pop(key, None)
 
-    def list_sessions(self, user_id: str | None = None) -> list[dict[str, Any]]:
+    def list_sessions(self, user_id: Optional[str] = None) -> list[dict[str, Any]]:
         """List sessions, optionally filtered by user_id, newest first."""
         conn = self._get_conn()
         query = """

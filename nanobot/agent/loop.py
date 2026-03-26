@@ -6,9 +6,8 @@ import asyncio
 import json
 import re
 import weakref
-from contextlib import AsyncExitStack
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import Optional, TYPE_CHECKING, Any, Awaitable, Callable
 
 from loguru import logger
 
@@ -51,21 +50,20 @@ class AgentLoop:
         bus: MessageBus,
         provider: LLMProvider,
         workspace: Path,
-        model: str | None = None,
+        model: Optional[str] = None,
         max_iterations: int = 40,
         temperature: float = 0.1,
         max_tokens: int = 4096,
         memory_window: int = 100,
-        reasoning_effort: str | None = None,
+        reasoning_effort: Optional[str] = None,
         stream: bool = False,
-        brave_api_key: str | None = None,
-        web_proxy: str | None = None,
-        exec_config: ExecToolConfig | None = None,
-        cron_service: CronService | None = None,
+        brave_api_key: Optional[str] = None,
+        web_proxy: Optional[str] = None,
+        exec_config: Optional[ExecToolConfig] = None,
+        cron_service: Optional[CronService] = None,
         restrict_to_workspace: bool = False,
-        session_manager: SessionManager | None = None,
-        mcp_servers: dict | None = None,
-        channels_config: ChannelsConfig | None = None,
+        session_manager: Optional[SessionManager] = None,
+        channels_config: Optional[ChannelsConfig] = None,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.bus = bus
@@ -103,10 +101,6 @@ class AgentLoop:
         )
 
         self._running = False
-        self._mcp_servers = mcp_servers or {}
-        self._mcp_stack: AsyncExitStack | None = None
-        self._mcp_connected = False
-        self._mcp_connecting = False
         self._consolidating: set[str] = set()  # Session keys with consolidation in progress
         self._consolidation_tasks: set[asyncio.Task] = set()  # Strong refs to in-flight tasks
         self._consolidation_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
@@ -132,29 +126,7 @@ class AgentLoop:
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
 
-    async def _connect_mcp(self) -> None:
-        """Connect to configured MCP servers (one-time, lazy)."""
-        if self._mcp_connected or self._mcp_connecting or not self._mcp_servers:
-            return
-        self._mcp_connecting = True
-        from nanobot.agent.tools.mcp import connect_mcp_servers
-        try:
-            self._mcp_stack = AsyncExitStack()
-            await self._mcp_stack.__aenter__()
-            await connect_mcp_servers(self._mcp_servers, self.tools, self._mcp_stack)
-            self._mcp_connected = True
-        except Exception as e:
-            logger.error("Failed to connect MCP servers (will retry next message): {}", e)
-            if self._mcp_stack:
-                try:
-                    await self._mcp_stack.aclose()
-                except Exception:
-                    pass
-                self._mcp_stack = None
-        finally:
-            self._mcp_connecting = False
-
-    def _set_tool_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
+    def _set_tool_context(self, channel: str, chat_id: str, message_id: Optional[str] = None) -> None:
         """Update context for all tools that need routing info."""
         for name in ("message", "spawn", "cron"):
             if tool := self.tools.get(name):
@@ -162,11 +134,19 @@ class AgentLoop:
                     tool.set_context(channel, chat_id, *([message_id] if name == "message" else []))
 
     @staticmethod
-    def _strip_think(text: str | None) -> str | None:
+    def _strip_think(text: Optional[str]) -> Optional[str]:
         """Remove <think>…</think> blocks that some models embed in content."""
         if not text:
             return None
         return re.sub(r"<think>[\s\S]*?</think>", "", text).strip() or None
+
+    @staticmethod
+    def _truncate_tool_result(content: str, max_chars: int) -> str:
+        """Truncate tool result keeping head and tail so both start and end are visible."""
+        head = max_chars * 3 // 5
+        tail = max_chars - head
+        omitted = len(content) - head - tail
+        return content[:head] + f"\n... ({omitted} chars omitted) ...\n" + content[-tail:]
 
     @staticmethod
     def _tool_hint(tool_calls: list) -> str:
@@ -182,8 +162,8 @@ class AgentLoop:
     async def _run_agent_loop(
         self,
         initial_messages: list[dict],
-        on_progress: Callable[..., Awaitable[None]] | None = None,
-    ) -> tuple[str | None, list[str], list[dict]]:
+        on_progress: Optional[Callable[..., Awaitable[None]]] = None,
+    ) -> tuple[Optional[str], list[str], list[dict]]:
         """Run the agent iteration loop. Returns (final_content, tools_used, messages)."""
         messages = initial_messages
         iteration = 0
@@ -276,7 +256,6 @@ class AgentLoop:
     async def run(self) -> None:
         """Run the agent loop, dispatching messages as tasks to stay responsive to /stop."""
         self._running = True
-        await self._connect_mcp()
         logger.info("Agent loop started")
 
         while self._running:
@@ -331,15 +310,6 @@ class AgentLoop:
                     content="Sorry, I encountered an error.",
                 ))
 
-    async def close_mcp(self) -> None:
-        """Close MCP connections."""
-        if self._mcp_stack:
-            try:
-                await self._mcp_stack.aclose()
-            except (RuntimeError, BaseExceptionGroup):
-                pass  # MCP SDK cancel scope cleanup is noisy but harmless
-            self._mcp_stack = None
-
     def stop(self) -> None:
         """Stop the agent loop."""
         self._running = False
@@ -348,9 +318,9 @@ class AgentLoop:
     async def _process_message(
         self,
         msg: InboundMessage,
-        session_key: str | None = None,
-        on_progress: Callable[[str], Awaitable[None]] | None = None,
-    ) -> OutboundMessage | None:
+        session_key: Optional[str] = None,
+        on_progress: Optional[Callable[[str], Awaitable[None]]] = None,
+    ) -> Optional[OutboundMessage]:
         """Process a single inbound message and return the response."""
         # System messages: parse origin from chat_id ("channel:chat_id")
         if msg.channel == "system":
@@ -481,7 +451,7 @@ class AgentLoop:
             if role == "assistant" and not content and not entry.get("tool_calls"):
                 continue  # skip empty assistant messages — they poison session context
             if role == "tool" and isinstance(content, str) and len(content) > self._TOOL_RESULT_MAX_CHARS:
-                entry["content"] = content[:self._TOOL_RESULT_MAX_CHARS] + "\n... (truncated)"
+                entry["content"] = self._truncate_tool_result(content, self._TOOL_RESULT_MAX_CHARS)
             elif role == "user":
                 if isinstance(content, str) and content.startswith(ContextBuilder._RUNTIME_CONTEXT_TAG):
                     # Strip the runtime-context prefix, keep only the user text.
@@ -508,7 +478,7 @@ class AgentLoop:
         session.updated_at = datetime.now()
 
     @staticmethod
-    def _extract_user_id(session_key: str) -> str | None:
+    def _extract_user_id(session_key: str) -> Optional[str]:
         """Extract user_id from session key for http/cli channels only.
 
         http:alice:tab1  → "alice"
@@ -535,10 +505,9 @@ class AgentLoop:
         session_key: str = "cli:direct",
         channel: str = "cli",
         chat_id: str = "direct",
-        on_progress: Callable[[str], Awaitable[None]] | None = None,
+        on_progress: Optional[Callable[[str], Awaitable[None]]] = None,
     ) -> str:
         """Process a message directly (for CLI or cron usage)."""
-        await self._connect_mcp()
         msg = InboundMessage(channel=channel, sender_id="user", chat_id=chat_id, content=content)
         response = await self._process_message(msg, session_key=session_key, on_progress=on_progress)
         return response.content if response else ""

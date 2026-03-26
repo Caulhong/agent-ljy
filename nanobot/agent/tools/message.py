@@ -1,6 +1,8 @@
 """Message tool for sending messages to users."""
 
-from typing import Any, Awaitable, Callable
+from __future__ import annotations
+
+from typing import Optional, Any, Awaitable, Callable
 
 from nanobot.agent.tools.base import Tool
 from nanobot.bus.events import OutboundMessage
@@ -11,10 +13,10 @@ class MessageTool(Tool):
 
     def __init__(
         self,
-        send_callback: Callable[[OutboundMessage], Awaitable[None]] | None = None,
+        send_callback: Optional[Callable[[OutboundMessage], Awaitable[None]]] = None,
         default_channel: str = "",
         default_chat_id: str = "",
-        default_message_id: str | None = None,
+        default_message_id: Optional[str] = None,
     ):
         self._send_callback = send_callback
         self._default_channel = default_channel
@@ -22,7 +24,7 @@ class MessageTool(Tool):
         self._default_message_id = default_message_id
         self._sent_in_turn: bool = False
 
-    def set_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
+    def set_context(self, channel: str, chat_id: str, message_id: Optional[str] = None) -> None:
         """Set the current message context."""
         self._default_channel = channel
         self._default_chat_id = chat_id
@@ -73,10 +75,10 @@ class MessageTool(Tool):
     async def execute(
         self,
         content: str,
-        channel: str | None = None,
-        chat_id: str | None = None,
-        message_id: str | None = None,
-        media: list[str] | None = None,
+        channel: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        message_id: Optional[str] = None,
+        media: Optional[list[str]] = None,
         **kwargs: Any
     ) -> str:
         channel = channel or self._default_channel

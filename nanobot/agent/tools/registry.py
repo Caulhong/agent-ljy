@@ -1,6 +1,8 @@
 """Tool registry for dynamic tool management."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import Optional, Any
 
 from nanobot.agent.tools.base import Tool
 
@@ -23,7 +25,7 @@ class ToolRegistry:
         """Unregister a tool by name."""
         self._tools.pop(name, None)
 
-    def get(self, name: str) -> Tool | None:
+    def get(self, name: str) -> Optional[Tool]:
         """Get a tool by name."""
         return self._tools.get(name)
 

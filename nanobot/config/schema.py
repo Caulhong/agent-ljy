@@ -1,7 +1,9 @@
 """Configuration schema using Pydantic."""
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Literal
+from typing import Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -43,7 +45,7 @@ class AgentDefaults(Base):
     temperature: float = 0.1
     max_tool_iterations: int = 40
     memory_window: int = 100
-    reasoning_effort: str | None = None  # low / medium / high — enables LLM thinking mode
+    reasoning_effort: Optional[str] = None  # low / medium / high — enables LLM thinking mode
     stream: bool = False  # stream LLM text tokens as progress messages
 
 
@@ -57,8 +59,8 @@ class ProviderConfig(Base):
     """LLM provider configuration."""
 
     api_key: str = ""
-    api_base: str | None = None
-    extra_headers: dict[str, str] | None = None  # Custom headers (e.g. APP-Code for AiHubMix)
+    api_base: Optional[str] = None
+    extra_headers: Optional[Dict[str, str]] = None  # Custom headers (e.g. APP-Code for AiHubMix)
 
 
 class ProvidersConfig(Base):
@@ -109,7 +111,7 @@ class WebSearchConfig(Base):
 class WebToolsConfig(Base):
     """Web tools configuration."""
 
-    proxy: str | None = (
+    proxy: Optional[str] = (
         None  # HTTP/SOCKS5 proxy URL, e.g. "http://127.0.0.1:7890" or "socks5://127.0.0.1:1080"
     )
     search: WebSearchConfig = Field(default_factory=WebSearchConfig)
@@ -125,7 +127,7 @@ class ExecToolConfig(Base):
 class MCPServerConfig(Base):
     """MCP server connection configuration (stdio or HTTP)."""
 
-    type: Literal["stdio", "sse", "streamableHttp"] | None = None  # auto-detected if omitted
+    type: Optional[Literal["stdio", "sse", "streamableHttp"]] = None  # auto-detected if omitted
     command: str = ""  # Stdio: command to run (e.g. "npx")
     args: list[str] = Field(default_factory=list)  # Stdio: command arguments
     env: dict[str, str] = Field(default_factory=dict)  # Stdio: extra env vars
@@ -158,8 +160,8 @@ class Config(BaseSettings):
         return Path(self.agents.defaults.workspace).expanduser()
 
     def _match_provider(
-        self, model: str | None = None
-    ) -> tuple["ProviderConfig | None", str | None]:
+        self, model: Optional[str] = None
+    ) -> tuple["Optional[ProviderConfig]", Optional[str]]:
         """Match provider config and its registry name. Returns (config, spec_name)."""
         from nanobot.providers.registry import PROVIDERS
 
@@ -201,22 +203,22 @@ class Config(BaseSettings):
                 return p, spec.name
         return None, None
 
-    def get_provider(self, model: str | None = None) -> ProviderConfig | None:
+    def get_provider(self, model: Optional[str] = None) -> Optional[ProviderConfig]:
         """Get matched provider config (api_key, api_base, extra_headers). Falls back to first available."""
         p, _ = self._match_provider(model)
         return p
 
-    def get_provider_name(self, model: str | None = None) -> str | None:
+    def get_provider_name(self, model: Optional[str] = None) -> Optional[str]:
         """Get the registry name of the matched provider (e.g. "deepseek", "openrouter")."""
         _, name = self._match_provider(model)
         return name
 
-    def get_api_key(self, model: str | None = None) -> str | None:
+    def get_api_key(self, model: Optional[str] = None) -> Optional[str]:
         """Get API key for the given model. Falls back to first available key."""
         p = self.get_provider(model)
         return p.api_key if p else None
 
-    def get_api_base(self, model: str | None = None) -> str | None:
+    def get_api_base(self, model: Optional[str] = None) -> Optional[str]:
         """Get API base URL for the given model. Applies default URLs for known gateways."""
         from nanobot.providers.registry import find_by_name
 

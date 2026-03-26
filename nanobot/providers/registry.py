@@ -13,7 +13,7 @@ Every entry writes out all fields so you can copy-paste as a template.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Optional, Any
 
 
 @dataclass(frozen=True)
@@ -387,7 +387,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
 # ---------------------------------------------------------------------------
 
 
-def find_by_model(model: str) -> ProviderSpec | None:
+def find_by_model(model: str) -> Optional[ProviderSpec]:
     """Match a standard provider by model-name keyword (case-insensitive).
     Skips gateways/local — those are matched by api_key/api_base instead."""
     model_lower = model.lower()
@@ -410,10 +410,10 @@ def find_by_model(model: str) -> ProviderSpec | None:
 
 
 def find_gateway(
-    provider_name: str | None = None,
-    api_key: str | None = None,
-    api_base: str | None = None,
-) -> ProviderSpec | None:
+    provider_name: Optional[str] = None,
+    api_key: Optional[str] = None,
+    api_base: Optional[str] = None,
+) -> Optional[ProviderSpec]:
     """Detect gateway/local provider.
 
     Priority:
@@ -440,7 +440,7 @@ def find_gateway(
     return None
 
 
-def find_by_name(name: str) -> ProviderSpec | None:
+def find_by_name(name: str) -> Optional[ProviderSpec]:
     """Find a provider spec by config field name, e.g. "dashscope"."""
     for spec in PROVIDERS:
         if spec.name == name:

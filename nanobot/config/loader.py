@@ -1,5 +1,8 @@
 """Configuration loading utilities."""
 
+from __future__ import annotations
+from typing import Optional
+
 import json
 from pathlib import Path
 
@@ -7,7 +10,7 @@ from nanobot.config.schema import Config
 
 
 # Global variable to store current config path (for multi-instance support)
-_current_config_path: Path | None = None
+_current_config_path: Optional[Path] = None
 
 
 def set_config_path(path: Path) -> None:
@@ -23,7 +26,7 @@ def get_config_path() -> Path:
     return Path.home() / ".nanobot" / "config.json"
 
 
-def load_config(config_path: Path | None = None) -> Config:
+def load_config(config_path: Optional[Path] = None) -> Config:
     """
     Load configuration from file or create default.
 
@@ -48,7 +51,7 @@ def load_config(config_path: Path | None = None) -> Config:
     return Config()
 
 
-def save_config(config: Config, config_path: Path | None = None) -> None:
+def save_config(config: Config, config_path: Optional[Path] = None) -> None:
     """
     Save configuration to file.
 

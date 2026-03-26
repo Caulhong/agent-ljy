@@ -1,12 +1,14 @@
 """LiteLLM provider implementation for multi-provider support."""
 
+from __future__ import annotations
+
 import hashlib
 import os
 import secrets
 import string
-from typing import Any, Awaitable, Callable
+from typing import Optional, Any, Awaitable, Callable
 
-import json_repair
+import json
 import litellm
 from litellm import acompletion
 from loguru import logger
@@ -35,11 +37,11 @@ class LiteLLMProvider(LLMProvider):
 
     def __init__(
         self,
-        api_key: str | None = None,
-        api_base: str | None = None,
+        api_key: Optional[str] = None,
+        api_base: Optional[str] = None,
         default_model: str = "anthropic/claude-opus-4-5",
-        extra_headers: dict[str, str] | None = None,
-        provider_name: str | None = None,
+        extra_headers: Optional[dict[str, str]] = None,
+        provider_name: Optional[str] = None,
     ):
         super().__init__(api_key, api_base)
         self.default_model = default_model
@@ -62,7 +64,7 @@ class LiteLLMProvider(LLMProvider):
         # Drop unsupported parameters for providers (e.g., gpt-5 rejects some params)
         litellm.drop_params = True
 
-    def _setup_env(self, api_key: str, api_base: str | None, model: str) -> None:
+    def _setup_env(self, api_key: str, api_base: Optional[str], model: str) -> None:
         """Set environment variables based on detected provider."""
         spec = self._gateway or find_by_model(model)
         if not spec:
@@ -126,8 +128,8 @@ class LiteLLMProvider(LLMProvider):
     def _apply_cache_control(
         self,
         messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]] | None,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]] | None]:
+        tools: Optional[list[dict[str, Any]]],
+    ) -> tuple[list[dict[str, Any]], Optional[list[dict[str, Any]]]]:
         """Return copies of messages and tools with cache_control injected."""
         new_messages = []
         for msg in messages:
@@ -209,11 +211,11 @@ class LiteLLMProvider(LLMProvider):
     async def chat(
         self,
         messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]] | None = None,
-        model: str | None = None,
+        tools: Optional[list[dict[str, Any]]] = None,
+        model: Optional[str] = None,
         max_tokens: int = 4096,
         temperature: float = 0.7,
-        reasoning_effort: str | None = None,
+        reasoning_effort: Optional[str] = None,
     ) -> LLMResponse:
         """
         Send a chat completion request via LiteLLM.
@@ -307,7 +309,7 @@ class LiteLLMProvider(LLMProvider):
             # Parse arguments from JSON string if needed
             args = tc.function.arguments
             if isinstance(args, str):
-                args = json_repair.loads(args)
+                args = json.loads(args)
 
             tool_calls.append(ToolCallRequest(
                 id=_short_tool_id(),
@@ -338,12 +340,12 @@ class LiteLLMProvider(LLMProvider):
     async def stream_chat(
         self,
         messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]] | None = None,
-        model: str | None = None,
+        tools: Optional[list[dict[str, Any]]] = None,
+        model: Optional[str] = None,
         max_tokens: int = 4096,
         temperature: float = 0.7,
-        reasoning_effort: str | None = None,
-        on_token: Callable[[str], Awaitable[None]] | None = None,
+        reasoning_effort: Optional[str] = None,
+        on_token: Optional[Callable[[str], Awaitable[None]]] = None,
     ) -> LLMResponse:
         """Stream a chat completion, calling on_token for each text token."""
         original_model = model or self.default_model
@@ -419,7 +421,7 @@ class LiteLLMProvider(LLMProvider):
         for tc in tool_calls_acc.values():
             args = tc["arguments"]
             if isinstance(args, str):
-                args = json_repair.loads(args) if args else {}
+                args = json.loads(args) if args else {}
             tool_calls.append(ToolCallRequest(
                 id=_short_tool_id(),
                 name=tc["name"],

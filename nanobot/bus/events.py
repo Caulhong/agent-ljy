@@ -1,8 +1,10 @@
 """Event types for the message bus."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Optional, Any
 
 
 @dataclass
@@ -16,7 +18,7 @@ class InboundMessage:
     timestamp: datetime = field(default_factory=datetime.now)
     media: list[str] = field(default_factory=list)  # Media URLs
     metadata: dict[str, Any] = field(default_factory=dict)  # Channel-specific data
-    session_key_override: str | None = None  # Optional override for thread-scoped sessions
+    session_key_override: Optional[str] = None  # Optional override for thread-scoped sessions
 
     @property
     def session_key(self) -> str:
@@ -31,7 +33,7 @@ class OutboundMessage:
     channel: str
     chat_id: str
     content: str
-    reply_to: str | None = None
+    reply_to: Optional[str] = None
     media: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 

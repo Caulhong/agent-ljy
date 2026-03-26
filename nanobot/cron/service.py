@@ -1,12 +1,14 @@
 """Cron service for scheduling agent tasks."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Optional, Any, Callable, Coroutine
 
 from loguru import logger
 
@@ -17,7 +19,7 @@ def _now_ms() -> int:
     return int(time.time() * 1000)
 
 
-def _compute_next_run(schedule: CronSchedule, now_ms: int) -> int | None:
+def _compute_next_run(schedule: CronSchedule, now_ms: int) -> Optional[int]:
     """Compute next run time in ms."""
     if schedule.kind == "at":
         return schedule.at_ms if schedule.at_ms and schedule.at_ms > now_ms else None
@@ -66,13 +68,13 @@ class CronService:
     def __init__(
         self,
         store_path: Path,
-        on_job: Callable[[CronJob], Coroutine[Any, Any, str | None]] | None = None
+        on_job: Optional[Callable[[CronJob], Coroutine[Any, Any, Optional[str]]]] = None
     ):
         self.store_path = store_path
         self.on_job = on_job
-        self._store: CronStore | None = None
+        self._store: Optional[CronStore] = None
         self._last_mtime: float = 0.0
-        self._timer_task: asyncio.Task | None = None
+        self._timer_task: Optional[asyncio.Task] = None
         self._running = False
 
     def _load_store(self) -> CronStore:
@@ -197,7 +199,7 @@ class CronService:
             if job.enabled:
                 job.state.next_run_at_ms = _compute_next_run(job.schedule, now)
 
-    def _get_next_wake_ms(self) -> int | None:
+    def _get_next_wake_ms(self) -> Optional[int]:
         """Get the earliest next run time across all jobs."""
         if not self._store:
             return None
@@ -289,8 +291,8 @@ class CronService:
         schedule: CronSchedule,
         message: str,
         deliver: bool = False,
-        channel: str | None = None,
-        to: str | None = None,
+        channel: Optional[str] = None,
+        to: Optional[str] = None,
         delete_after_run: bool = False,
     ) -> CronJob:
         """Add a new job."""
@@ -337,7 +339,7 @@ class CronService:
 
         return removed
 
-    def enable_job(self, job_id: str, enabled: bool = True) -> CronJob | None:
+    def enable_job(self, job_id: str, enabled: bool = True) -> Optional[CronJob]:
         """Enable or disable a job."""
         store = self._load_store()
         for job in store.jobs:

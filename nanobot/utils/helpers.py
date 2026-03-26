@@ -1,11 +1,14 @@
 """Utility functions for nanobot."""
 
+from __future__ import annotations
+from typing import Optional
+
 import re
 from datetime import datetime
 from pathlib import Path
 
 
-def detect_image_mime(data: bytes) -> str | None:
+def detect_image_mime(data: bytes) -> Optional[str]:
     """Detect image MIME type from magic bytes, ignoring file extension."""
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         return "image/png"

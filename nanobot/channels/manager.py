@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Optional, Any
 
 from loguru import logger
 
@@ -24,12 +24,12 @@ class ChannelManager:
     - Route outbound messages
     """
 
-    def __init__(self, config: Config, bus: MessageBus, session_manager: SessionManager | None = None):
+    def __init__(self, config: Config, bus: MessageBus, session_manager: Optional[SessionManager] = None):
         self.config = config
         self.bus = bus
         self.session_manager = session_manager
         self.channels: dict[str, BaseChannel] = {}
-        self._dispatch_task: asyncio.Task | None = None
+        self._dispatch_task: Optional[asyncio.Task] = None
 
         self._init_channels()
 
@@ -128,7 +128,7 @@ class ChannelManager:
             except asyncio.CancelledError:
                 break
 
-    def get_channel(self, name: str) -> BaseChannel | None:
+    def get_channel(self, name: str) -> Optional[BaseChannel]:
         """Get a channel by name."""
         return self.channels.get(name)
 

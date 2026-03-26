@@ -1,6 +1,7 @@
 """Runtime path helpers derived from the active config context."""
 
 from __future__ import annotations
+from typing import Optional
 
 from pathlib import Path
 
@@ -18,7 +19,7 @@ def get_runtime_subdir(name: str) -> Path:
     return ensure_dir(get_data_dir() / name)
 
 
-def get_media_dir(channel: str | None = None) -> Path:
+def get_media_dir(channel: Optional[str] = None) -> Path:
     """Return the media directory, optionally namespaced per channel."""
     base = get_runtime_subdir("media")
     return ensure_dir(base / channel) if channel else base
@@ -34,7 +35,7 @@ def get_logs_dir() -> Path:
     return get_runtime_subdir("logs")
 
 
-def get_workspace_path(workspace: str | None = None) -> Path:
+def get_workspace_path(workspace: Optional[str] = None) -> Path:
     """Resolve and ensure the agent workspace path."""
     path = Path(workspace).expanduser() if workspace else Path.home() / ".nanobot" / "workspace"
     return ensure_dir(path)

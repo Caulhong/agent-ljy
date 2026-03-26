@@ -1,5 +1,8 @@
 """Skills loader for agent capabilities."""
 
+from __future__ import annotations
+from typing import Optional
+
 import json
 import os
 import re
@@ -18,7 +21,7 @@ class SkillsLoader:
     specific tools or perform certain tasks.
     """
 
-    def __init__(self, workspace: Path, builtin_skills_dir: Path | None = None):
+    def __init__(self, workspace: Path, builtin_skills_dir: Optional[Path] = None):
         self.workspace = workspace
         self.workspace_skills = workspace / "skills"
         self.builtin_skills = builtin_skills_dir or BUILTIN_SKILLS_DIR
@@ -56,7 +59,7 @@ class SkillsLoader:
             return [s for s in skills if self._check_requirements(self._get_skill_meta(s["name"]))]
         return skills
 
-    def load_skill(self, name: str) -> str | None:
+    def load_skill(self, name: str) -> Optional[str]:
         """
         Load a skill by name.
 
@@ -200,7 +203,7 @@ class SkillsLoader:
                 result.append(s["name"])
         return result
 
-    def get_skill_metadata(self, name: str) -> dict | None:
+    def get_skill_metadata(self, name: str) -> Optional[dict]:
         """
         Get metadata from a skill's frontmatter.
 

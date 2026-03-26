@@ -1,7 +1,9 @@
 """Base channel interface for chat platforms."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Optional, Any
 
 from loguru import logger
 
@@ -73,9 +75,9 @@ class BaseChannel(ABC):
         sender_id: str,
         chat_id: str,
         content: str,
-        media: list[str] | None = None,
-        metadata: dict[str, Any] | None = None,
-        session_key: str | None = None,
+        media: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        session_key: Optional[str] = None,
     ) -> None:
         """
         Handle an incoming message from the chat platform.

@@ -1,7 +1,9 @@
 """Cron tool for scheduling reminders and tasks."""
 
+from __future__ import annotations
+
 from contextvars import ContextVar
-from typing import Any
+from typing import Optional, Any
 
 from nanobot.agent.tools.base import Tool
 from nanobot.cron.service import CronService
@@ -74,11 +76,11 @@ class CronTool(Tool):
         self,
         action: str,
         message: str = "",
-        every_seconds: int | None = None,
-        cron_expr: str | None = None,
-        tz: str | None = None,
-        at: str | None = None,
-        job_id: str | None = None,
+        every_seconds: Optional[int] = None,
+        cron_expr: Optional[str] = None,
+        tz: Optional[str] = None,
+        at: Optional[str] = None,
+        job_id: Optional[str] = None,
         **kwargs: Any,
     ) -> str:
         if action == "add":
@@ -94,10 +96,10 @@ class CronTool(Tool):
     def _add_job(
         self,
         message: str,
-        every_seconds: int | None,
-        cron_expr: str | None,
-        tz: str | None,
-        at: str | None,
+        every_seconds: Optional[int],
+        cron_expr: Optional[str],
+        tz: Optional[str],
+        at: Optional[str],
     ) -> str:
         if not message:
             return "Error: message is required for add"
@@ -150,7 +152,7 @@ class CronTool(Tool):
         lines = [f"- {j.name} (id: {j.id}, {j.schedule.kind})" for j in jobs]
         return "Scheduled jobs:\n" + "\n".join(lines)
 
-    def _remove_job(self, job_id: str | None) -> str:
+    def _remove_job(self, job_id: Optional[str]) -> str:
         if not job_id:
             return "Error: job_id is required for remove"
         if self._cron.remove_job(job_id):

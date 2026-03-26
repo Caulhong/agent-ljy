@@ -1,5 +1,8 @@
 """CLI commands for nanobot."""
 
+from __future__ import annotations
+from typing import Optional
+
 import asyncio
 import os
 import select
@@ -46,7 +49,7 @@ EXIT_COMMANDS = {"exit", "quit", "/exit", "/quit", ":q"}
 # CLI input: prompt_toolkit for editing, paste, history, and display
 # ---------------------------------------------------------------------------
 
-_PROMPT_SESSION: PromptSession | None = None
+_PROMPT_SESSION: Optional[PromptSession] = None
 _SAVED_TERM_ATTRS = None  # original termios settings, restored on exit
 
 
@@ -213,16 +216,9 @@ def onboard():
 
 def _make_provider(config: Config):
     """Create the appropriate LLM provider from config."""
-    from nanobot.providers.openai_codex_provider import OpenAICodexProvider
-    from nanobot.providers.azure_openai_provider import AzureOpenAIProvider
-
     model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
     p = config.get_provider(model)
-
-    # OpenAI Codex (OAuth)
-    if provider_name == "openai_codex" or model.startswith("openai-codex/"):
-        return OpenAICodexProvider(default_model=model)
 
     # Custom: direct OpenAI-compatible endpoint, bypasses LiteLLM
     from nanobot.providers.custom_provider import CustomProvider
@@ -230,20 +226,6 @@ def _make_provider(config: Config):
         return CustomProvider(
             api_key=p.api_key if p else "no-key",
             api_base=config.get_api_base(model) or "http://localhost:8000/v1",
-            default_model=model,
-        )
-
-    # Azure OpenAI: direct Azure OpenAI endpoint with deployment name
-    if provider_name == "azure_openai":
-        if not p or not p.api_key or not p.api_base:
-            console.print("[red]Error: Azure OpenAI requires api_key and api_base.[/red]")
-            console.print("Set them in ~/.nanobot/config.json under providers.azure_openai section")
-            console.print("Use the model field to specify the deployment name.")
-            raise typer.Exit(1)
-        
-        return AzureOpenAIProvider(
-            api_key=p.api_key,
-            api_base=p.api_base,
             default_model=model,
         )
 
@@ -264,7 +246,7 @@ def _make_provider(config: Config):
     )
 
 
-def _load_runtime_config(config: str | None = None, workspace: str | None = None) -> Config:
+def _load_runtime_config(config: Optional[str] = None, workspace: Optional[str] = None) -> Config:
     """Load config and optionally override the active workspace."""
     from nanobot.config.loader import load_config, set_config_path
 
@@ -291,9 +273,9 @@ def _load_runtime_config(config: str | None = None, workspace: str | None = None
 @app.command()
 def gateway(
     port: int = typer.Option(18790, "--port", "-p", help="Gateway port"),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
+    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
-    config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to config file"),
 ):
     """Start the nanobot gateway."""
     from nanobot.agent.loop import AgentLoop
@@ -339,12 +321,11 @@ def gateway(
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         session_manager=session_manager,
-        mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
     )
 
     # Set cron callback (needs agent)
-    async def on_cron_job(job: CronJob) -> str | None:
+    async def on_cron_job(job: CronJob) -> Optional[str]:
         """Execute a cron job through the agent."""
         from nanobot.agent.tools.cron import CronTool
         from nanobot.agent.tools.message import MessageTool
@@ -460,7 +441,6 @@ def gateway(
         except KeyboardInterrupt:
             console.print("\nShutting down...")
         finally:
-            await agent.close_mcp()
             heartbeat.stop()
             cron.stop()
             agent.stop()
@@ -480,8 +460,8 @@ def gateway(
 def agent(
     message: str = typer.Option(None, "--message", "-m", help="Message to send to the agent"),
     session_id: str = typer.Option(None, "--session", "-s", help="Session ID"),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
-    config: str | None = typer.Option(None, "--config", "-c", help="Config file path"),
+    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="Config file path"),
     markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
     logs: bool = typer.Option(False, "--logs/--no-logs", help="Show nanobot runtime logs during chat"),
 ):
@@ -529,7 +509,6 @@ def agent(
         exec_config=config.tools.exec,
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
-        mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
     )
 
@@ -555,7 +534,6 @@ def agent(
             with _thinking_ctx():
                 response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
             _print_agent_response(response, render_markdown=markdown)
-            await agent_loop.close_mcp()
 
         asyncio.run(run_once())
     else:
@@ -659,7 +637,6 @@ def agent(
                 agent_loop.stop()
                 outbound_task.cancel()
                 await asyncio.gather(bus_task, outbound_task, return_exceptions=True)
-                await agent_loop.close_mcp()
 
         asyncio.run(run_interactive())
 

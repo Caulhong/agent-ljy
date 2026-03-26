@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from loguru import logger
 
@@ -32,7 +32,9 @@ _SAVE_MEMORY_TOOL = [
                     "memory_update": {
                         "type": "string",
                         "description": "Full updated long-term memory as markdown. Include all existing "
-                        "facts plus new ones. Return unchanged if nothing new.",
+                        "facts plus new ones. If new information conflicts with an existing entry, "
+                        "remove or update the outdated entry — newer information takes precedence. "
+                        "Never keep two conflicting facts. Return unchanged if nothing new.",
                     },
                 },
                 "required": ["history_entry", "memory_update"],
@@ -78,7 +80,7 @@ def init_user_workspace(workspace: Path, user_id: str) -> Path:
 class MemoryStore:
     """Two-layer memory: MEMORY.md (long-term facts) + HISTORY.md (grep-searchable log)."""
 
-    def __init__(self, workspace: Path, user_id: str | None = None):
+    def __init__(self, workspace: Path, user_id: Optional[str] = None):
         if user_id:
             base = init_user_workspace(workspace, user_id)
         else:
@@ -99,9 +101,26 @@ class MemoryStore:
         with open(self.history_file, "a", encoding="utf-8") as f:
             f.write(entry.rstrip() + "\n\n")
 
+    def read_recent_history(self, max_entries: int = 10) -> str:
+        """Return the last N entries from HISTORY.md, or empty string if none."""
+        if not self.history_file.exists():
+            return ""
+        text = self.history_file.read_text(encoding="utf-8").strip()
+        if not text:
+            return ""
+        # Entries are separated by double newlines; split and take last N
+        entries = [e.strip() for e in text.split("\n\n") if e.strip()]
+        return "\n\n".join(entries[-max_entries:])
+
     def get_memory_context(self) -> str:
+        parts = []
         long_term = self.read_long_term()
-        return f"## Long-term Memory\n{long_term}" if long_term else ""
+        if long_term:
+            parts.append(f"## Long-term Memory\n{long_term}")
+        recent_history = self.read_recent_history()
+        if recent_history:
+            parts.append(f"## Recent Session History\n{recent_history}")
+        return "\n\n".join(parts)
 
     async def consolidate(
         self,
@@ -150,7 +169,7 @@ class MemoryStore:
         try:
             response = await provider.chat(
                 messages=[
-                    {"role": "system", "content": "You are a memory consolidation agent. Call the save_memory tool with your consolidation of the conversation."},
+                    {"role": "system", "content": "You are a memory consolidation agent. Call the save_memory tool with your consolidation of the conversation. When new information conflicts with existing memory, prefer the newer information and remove the outdated entry — never keep two conflicting facts."},
                     {"role": "user", "content": prompt},
                 ],
                 tools=_SAVE_MEMORY_TOOL,

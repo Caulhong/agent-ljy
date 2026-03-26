@@ -1,10 +1,12 @@
 """Shell execution tool."""
 
+from __future__ import annotations
+
 import asyncio
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Optional, Any
 
 from nanobot.agent.tools.base import Tool
 
@@ -15,9 +17,9 @@ class ExecTool(Tool):
     def __init__(
         self,
         timeout: int = 60,
-        working_dir: str | None = None,
-        deny_patterns: list[str] | None = None,
-        allow_patterns: list[str] | None = None,
+        working_dir: Optional[str] = None,
+        deny_patterns: Optional[list[str]] = None,
+        allow_patterns: Optional[list[str]] = None,
         restrict_to_workspace: bool = False,
         path_append: str = "",
     ):
@@ -63,7 +65,7 @@ class ExecTool(Tool):
             "required": ["command"]
         }
     
-    async def execute(self, command: str, working_dir: str | None = None, **kwargs: Any) -> str:
+    async def execute(self, command: str, working_dir: Optional[str] = None, **kwargs: Any) -> str:
         cwd = working_dir or self.working_dir or os.getcwd()
         guard_error = self._guard_command(command, cwd)
         if guard_error:
@@ -122,7 +124,7 @@ class ExecTool(Tool):
         except Exception as e:
             return f"Error executing command: {str(e)}"
 
-    def _guard_command(self, command: str, cwd: str) -> str | None:
+    def _guard_command(self, command: str, cwd: str) -> Optional[str]:
         """Best-effort safety guard for potentially destructive commands."""
         cmd = command.strip()
         lower = cmd.lower()
